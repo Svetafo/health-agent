@@ -51,12 +51,12 @@ Telegram / Health Devices
 
 | Connector | Status | Method |
 |-----------|--------|--------|
-| Apple Health | ✅ Ready | Weekly export.xml |
+| Apple Health | ✅ Tested in production | Weekly export.xml |
 | Oura Ring | 🔜 Planned | REST API + OAuth 2.0 |
 | Whoop | 🔜 Planned | REST API + Webhooks |
 | Garmin | 🔜 Planned | garminconnect (unofficial) |
 
-Each connector is an independent module in `connectors/`. Add only what you need.
+Apple Health is the only connector tested in production. Oura, Whoop and Garmin connectors are planned but not yet implemented — if you own one of these devices and want to contribute, PRs are very welcome.
 
 ## Stack
 
