@@ -100,17 +100,12 @@ TELEGRAM_BOT_TOKEN=
 ALLOWED_USER_IDS=your_telegram_id
 LLM_PROVIDER=anthropic
 AGENT_MODEL=anthropic/claude-haiku-4-5-20251001
-CHEAP_MODEL=openai/gpt-4o-mini
+PARSING_MODEL=openai/gpt-4o-mini
 OPENAI_API_KEY=
 ANTHROPIC_API_KEY=
+GROQ_API_KEY=           # optional — voice message transcription via Whisper
 INTERNAL_API_KEY=
 ```
-
-## Docs
-
-- [`docs/architecture.md`](docs/architecture.md) — system architecture
-- [`docs/data-schema.md`](docs/data-schema.md) — all database tables
-- [`docs/commands.md`](docs/commands.md) — command reference
 
 ## License
 
