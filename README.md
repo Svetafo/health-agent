@@ -65,14 +65,39 @@ Apple Health is the only connector tested in production. Oura, Whoop and Garmin 
 - LiteLLM (Claude, OpenAI, Gemini — swap via `.env`)
 - n8n · Docker Compose
 
+## Prerequisites
+
+- Docker + Docker Compose
+- A server with a public IP (or run locally)
+- [Telegram bot token](https://t.me/BotFather) — create a bot, copy the token
+- At least one LLM API key: [Anthropic](https://console.anthropic.com) or [OpenAI](https://platform.openai.com)
+- Your Telegram user ID — send `/start` to [@userinfobot](https://t.me/userinfobot)
+
 ## Quick start
 
 ```bash
 git clone https://github.com/Svetafo/health-agent
 cd health-agent
 cp .env.example .env
-# Fill in your Telegram bot token, LLM API keys, user ID
+# Edit .env: set TELEGRAM_BOT_TOKEN, ALLOWED_USER_IDS, API keys
 docker compose up -d
+```
+
+Open Telegram, find your bot, send `/help`. If you see the command list — it's running.
+
+## Apple Health setup
+
+Health data flows via iOS Shortcuts → n8n webhook → agent.
+
+1. Open n8n at `http://your-server:5678`, create an account
+2. Import workflows from `n8n/workflows/` via **Settings → Import**
+3. In your iPhone, create a Shortcut that sends Apple Health metrics as JSON to `http://your-server:5678/webhook/health`
+4. Set up a daily automation to run the shortcut at 23:58
+
+For the full field mapping see `src/health/intake.py`. Alternatively, export `export.xml` from the Health app weekly and run:
+
+```bash
+docker exec bmindset-app-1 python3 scripts/import_health_export.py /path/to/export.xml
 ```
 
 ## Bot commands
@@ -106,6 +131,16 @@ ANTHROPIC_API_KEY=
 GROQ_API_KEY=           # optional — voice message transcription via Whisper
 INTERNAL_API_KEY=
 ```
+
+## Contributing
+
+PRs welcome, especially:
+
+- **Device connectors** — Oura Ring, Whoop, Garmin (see `src/health/` for the intake pattern)
+- **New bot commands** — workout logging, medication tracking, custom metrics
+- **Bugfixes and tests**
+
+Please open an issue before starting a large feature.
 
 ## License
 
