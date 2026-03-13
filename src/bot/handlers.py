@@ -1165,7 +1165,7 @@ async def _handle_text(message: Message, db: asyncpg.Pool, user_id: str) -> None
                     agent_tools = [t for t in ANALYST_TOOLS if t["function"]["name"] in selected_names]
             else:
                 agent_tools = select_tools(text)
-                data_tools = [t for t in agent_tools if t["function"]["name"] not in ("get_user_profile", "get_memory_insights")]
+                data_tools = [t for t in agent_tools if t["function"]["name"] not in ("get_user_profile", "get_memory_insights", "search_knowledge_base")]
                 if not data_tools:
                     agent_tools = None  # plain text without data — fall through to ask_model
 
@@ -1324,6 +1324,8 @@ _FOLLOWUP_SIGNALS = (
 def _needs_history(query: str) -> bool:
     """True if the query looks like a follow-up and needs context of previous messages."""
     q = query.lower()
+    if len(q.split()) <= 5:  # short messages are almost always follow-ups
+        return True
     return any(signal in q for signal in _FOLLOWUP_SIGNALS)
 
 
