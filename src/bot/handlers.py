@@ -721,6 +721,15 @@ async def _handle_text(message: Message, db: asyncpg.Pool, user_id: str) -> None
                 except (ValueError, TypeError):
                     clean.pop("date", None)
 
+            data_fields = {k: v for k, v in clean.items() if k != "date"}
+            if not data_fields:
+                await message.answer(
+                    "Could not read data from the photo. "
+                    "Try sending a clearer screenshot of the scale or enter data as text — "
+                    "for example: 'weight 65.2, fat 34.8, muscle 39.5'"
+                )
+                return
+
             # If buffer already has data with different date — save previous
             buf_date = _weight_buffer.get(user_id, {}).get("date")
             new_date = clean.get("date")
@@ -764,6 +773,13 @@ async def _handle_text(message: Message, db: asyncpg.Pool, user_id: str) -> None
             await message.bot.download(photo, destination=img_buf)
             result = await analyze_sleep_image(img_buf.getvalue(), "image/jpeg")
             clean = {k: v for k, v in result.items() if v is not None}
+            if not clean:
+                await message.answer(
+                    "Could not read sleep data from the photo. "
+                    "Try a different screenshot or enter manually — "
+                    "for example: 'start 23:10 end 6:45'"
+                )
+                return
             buf = _sleep_buffer.get(user_id, {})
             # If buffer already has different date — auto-save and start new buffer
             if buf and clean.get("sleep_date") and buf.get("sleep_date") and buf["sleep_date"] != clean["sleep_date"]:
@@ -1273,9 +1289,18 @@ async def _get_session_history(conn: asyncpg.Connection, session_id: int) -> lis
 
 
 _FOLLOWUP_SIGNALS = (
-    "these", "this", "that", "then", "there",
+    "эти", "этот", "эта", "это", "те", "тот", "та", "тогда", "там",
+    "выше", "ниже", "такой", "такая", "таких",
+    "а теперь", "а сейчас", "а что", "продолжи", "продолжай",
+    "расскажи подробнее", "ещё", "еще", "и что", "почему тогда",
+    "сравни", "сравнить", "покажи разницу", "в чём разница",
+    "что если", "а если", "а когда",
+    "поясни", "объясни", "что значит", "как это",
+    "из-за чего", "с чем связано", "почему так",
+    "these", "this", "that", "those", "then", "there",
     "above", "below", "and now", "continue", "more details",
     "tell me more", "more", "and what", "why then",
+    "compare", "difference", "what if", "why so", "explain",
 )
 
 
