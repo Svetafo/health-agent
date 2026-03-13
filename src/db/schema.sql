@@ -27,36 +27,36 @@ CREATE TABLE IF NOT EXISTS messages (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Нормализация данных Apple Health перед вставкой (выполняется в Python):
---   - Числа с запятой → точка: "3,14" → 3.14  (русская локаль iPhone)
---   - Пустые строки → NULL: "" → None
---   - Используется NUMERIC вместо FLOAT — точное хранение, без floating point ошибок
+-- Apple Health data normalization before insert (performed in Python):
+--   - Comma decimal separator → dot: "3,14" → 3.14  (iPhone Russian locale)
+--   - Empty strings → NULL: "" → None
+--   - NUMERIC instead of FLOAT — exact storage, no floating point errors
 --
--- Одна строка = один день на пользователя (Apple Health агрегирует по суткам).
--- При повторной отправке — upsert по (user_id, recorded_date).
+-- One row = one day per user (Apple Health aggregates by day).
+-- On duplicate submission — upsert by (user_id, recorded_date).
 
 CREATE TABLE IF NOT EXISTS health_metrics (
     id              BIGSERIAL PRIMARY KEY,
     user_id         TEXT NOT NULL,
-    recorded_date   DATE NOT NULL,           -- дата из Shortcuts (отдельное поле)
+    recorded_date   DATE NOT NULL,           -- date from Shortcuts (separate field)
 
-    -- Метрики из Apple Health (все nullable — поле может отсутствовать)
-    hrv_ms          NUMERIC(6,1),            -- вариабельность ЧСС, мс
-    vo2max          NUMERIC(5,2),            -- VO2 max, мл/кг/мин
-    heart_rate      NUMERIC(5,1),            -- ЧСС средняя, уд/мин
-    resting_hr      NUMERIC(5,1),            -- ЧСС в покое, уд/мин
-    steps           INTEGER,                 -- шаги за день
-    flights         INTEGER,                 -- пролёты лестниц
-    active_kcal     NUMERIC(8,2),            -- активные калории, ккал
-    resting_kcal    NUMERIC(8,2),            -- калории покоя (BMR), ккал
-    distance_km     NUMERIC(8,3),            -- дистанция, км
-    walking_speed   NUMERIC(5,2),            -- средняя скорость ходьбы, км/ч
+    -- Apple Health metrics (all nullable — field may be absent)
+    hrv_ms          NUMERIC(6,1),            -- HRV, ms
+    vo2max          NUMERIC(5,2),            -- VO2 max, ml/kg/min
+    heart_rate      NUMERIC(5,1),            -- avg heart rate, bpm
+    resting_hr      NUMERIC(5,1),            -- resting heart rate, bpm
+    steps           INTEGER,                 -- steps per day
+    flights         INTEGER,                 -- flights climbed
+    active_kcal     NUMERIC(8,2),            -- active calories, kcal
+    resting_kcal    NUMERIC(8,2),            -- resting calories (BMR), kcal
+    distance_km     NUMERIC(8,3),            -- distance, km
+    walking_speed   NUMERIC(5,2),            -- avg walking speed, km/h
 
     source          TEXT NOT NULL DEFAULT 'apple_health',
     raw_event_id    BIGINT REFERENCES raw_events(id),
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    -- Один день на пользователя; повторная отправка → upsert
+    -- One day per user; duplicate submission → upsert
     UNIQUE (user_id, recorded_date)
 );
 
@@ -68,12 +68,12 @@ CREATE TABLE IF NOT EXISTS nutrition_logs (
     protein      NUMERIC(6,2),
     fat          NUMERIC(6,2),
     carbs        NUMERIC(6,2),
-    meals_json   JSONB,                          -- детали по приёмам пищи
+    meals_json   JSONB,                          -- meal details
     source       TEXT DEFAULT 'screenshot',
     raw_event_id BIGINT REFERENCES raw_events(id),
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    -- Один день на пользователя; повторная отправка → upsert
+    -- One day per user; duplicate submission → upsert
     UNIQUE (user_id, logged_date)
 );
 
@@ -83,32 +83,32 @@ CREATE TABLE IF NOT EXISTS user_profile (
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Метрики тела: умные весы + ручные замеры
--- Одна строка = один день на пользователя.
--- При повторной отправке — upsert по (user_id, recorded_date).
+-- Body metrics: smart scale + manual measurements
+-- One row = one day per user.
+-- On duplicate submission — upsert by (user_id, recorded_date).
 CREATE TABLE IF NOT EXISTS body_metrics (
     id              BIGSERIAL PRIMARY KEY,
     user_id         TEXT NOT NULL,
     recorded_date   DATE NOT NULL,
 
-    -- Показатели умных весов (извлекаются через vision LLM)
-    weight          NUMERIC(5,2),            -- вес, кг
-    body_fat_pct    NUMERIC(5,2),            -- жир, %
-    muscle_kg       NUMERIC(5,2),            -- мышцы, кг
-    water_pct       NUMERIC(5,2),            -- вода, %
-    visceral_fat    NUMERIC(5,1),            -- висцеральный жир (индекс)
-    bone_mass_kg    NUMERIC(4,2),            -- костная масса, кг
-    bmr_kcal        NUMERIC(6,1),            -- BMR, ккал
-    bmi             NUMERIC(4,1),            -- ИМТ
+    -- Smart scale metrics (extracted via vision LLM)
+    weight          NUMERIC(5,2),            -- weight, kg
+    body_fat_pct    NUMERIC(5,2),            -- body fat, %
+    muscle_kg       NUMERIC(5,2),            -- muscle mass, kg
+    water_pct       NUMERIC(5,2),            -- water, %
+    visceral_fat    NUMERIC(5,1),            -- visceral fat (index)
+    bone_mass_kg    NUMERIC(4,2),            -- bone mass, kg
+    bmr_kcal        NUMERIC(6,1),            -- BMR, kcal
+    bmi             NUMERIC(4,1),            -- BMI
 
-    -- Ручные замеры (сантиметры)
-    arms_cm         NUMERIC(5,1),            -- руки, см
-    thighs_cm       NUMERIC(5,1),            -- бёдра, см
-    neck_cm         NUMERIC(5,1),            -- шея, см
-    shin_cm         NUMERIC(5,1),            -- голень, см
-    waist_cm        NUMERIC(5,1),            -- талия, см
-    chest_cm        NUMERIC(5,1),            -- грудь, см
-    hips_cm         NUMERIC(5,1),            -- ягодицы/бёдра, см
+    -- Manual measurements (centimeters)
+    arms_cm         NUMERIC(5,1),            -- arms, cm
+    thighs_cm       NUMERIC(5,1),            -- thighs, cm
+    neck_cm         NUMERIC(5,1),            -- neck, cm
+    shin_cm         NUMERIC(5,1),            -- shin, cm
+    waist_cm        NUMERIC(5,1),            -- waist, cm
+    chest_cm        NUMERIC(5,1),            -- chest, cm
+    hips_cm         NUMERIC(5,1),            -- hips, cm
 
     source          TEXT NOT NULL DEFAULT 'manual',  -- 'scale_photo' | 'text' | 'manual'
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -116,34 +116,34 @@ CREATE TABLE IF NOT EXISTS body_metrics (
     UNIQUE (user_id, recorded_date)
 );
 
--- Паттерны памяти: накопление доказательной базы перед верификацией пользователем
--- Флоу: Synthesizer замечает паттерн → pending (confirmations++)
---        → при confirmations >= 3: semantic filter → /memory верификация
---        → confirmed: переходит в memory_insights
---        → expired: не набрал подтверждений за TTL → удаляется
+-- Memory patterns: accumulating evidence before user verification
+-- Flow: Synthesizer detects pattern → pending (confirmations++)
+--        → at confirmations >= 3: semantic filter → /memory verification
+--        → confirmed: moves to memory_insights
+--        → expired: not confirmed within TTL → deleted
 CREATE TABLE IF NOT EXISTS pending_insights (
     id              BIGSERIAL PRIMARY KEY,
     user_id         TEXT NOT NULL,
-    pattern_text    TEXT NOT NULL,              -- формулировка паттерна
-    confirmations   INT NOT NULL DEFAULT 1,     -- сколько раз паттерн замечен
+    pattern_text    TEXT NOT NULL,              -- pattern text
+    confirmations   INT NOT NULL DEFAULT 1,     -- how many times pattern was observed
     first_seen      DATE NOT NULL DEFAULT CURRENT_DATE,
     last_seen       DATE NOT NULL DEFAULT CURRENT_DATE,
-    expires_at      DATE NOT NULL,              -- TTL: если не подтверждён — удаляется
+    expires_at      DATE NOT NULL,              -- TTL: if not confirmed — deleted
     status          TEXT NOT NULL DEFAULT 'pending'
                     CHECK (status IN ('pending', 'confirmed', 'rejected', 'expired'))
 );
 
--- Подтверждённые паттерны: агент читает при каждом запросе
+-- Confirmed patterns: agent reads on every request
 CREATE TABLE IF NOT EXISTS memory_insights (
     id              BIGSERIAL PRIMARY KEY,
     user_id         TEXT NOT NULL,
-    insight_text    TEXT NOT NULL,              -- паттерн, подтверждённый пользователем
+    insight_text    TEXT NOT NULL,              -- pattern confirmed by user
     confirmed_at    DATE NOT NULL DEFAULT CURRENT_DATE,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Эмбеддинги сообщений для семантического поиска (pgvector)
--- Требует: CREATE EXTENSION vector; (миграция 001_pgvector.sql)
+-- Message embeddings for semantic search (pgvector)
+-- Requires: CREATE EXTENSION vector; (migration 001_pgvector.sql)
 CREATE TABLE IF NOT EXISTS message_embeddings (
     id          BIGSERIAL PRIMARY KEY,
     message_id  BIGINT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
@@ -153,7 +153,7 @@ CREATE TABLE IF NOT EXISTS message_embeddings (
     embedded_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Индексы
+-- Indexes
 CREATE INDEX IF NOT EXISTS idx_raw_events_source   ON raw_events(source);
 CREATE INDEX IF NOT EXISTS idx_raw_events_created  ON raw_events(created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_session    ON messages(session_id);

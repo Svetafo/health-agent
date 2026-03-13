@@ -1,8 +1,8 @@
-"""Конфигурация pytest: фейковые env-переменные для тестов без .env."""
+"""pytest configuration: fake env variables for tests without .env."""
 
 import os
 
-# Подставляем до импорта src.config.settings — иначе pydantic падает
+# Set before importing src.config.settings — otherwise pydantic fails
 os.environ.setdefault("TELEGRAM_BOT_TOKEN", "0:test_token_for_tests")
 os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost/test")
 os.environ.setdefault("OPENAI_API_KEY", "sk-test")

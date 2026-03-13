@@ -1,10 +1,10 @@
 -- migration: 003_knowledge_base.sql
 CREATE TABLE IF NOT EXISTS knowledge_chunks (
     id         BIGSERIAL PRIMARY KEY,
-    source     TEXT NOT NULL,        -- имя файла или URL
-    title      TEXT,                 -- заголовок документа
-    chunk_idx  INT  NOT NULL,        -- порядковый номер чанка в документе
-    content    TEXT NOT NULL,        -- текст чанка
+    source     TEXT NOT NULL,        -- filename or URL
+    title      TEXT,                 -- document title
+    chunk_idx  INT  NOT NULL,        -- chunk index in document
+    content    TEXT NOT NULL,        -- chunk text
     embedding  vector(1536) NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now()
 );

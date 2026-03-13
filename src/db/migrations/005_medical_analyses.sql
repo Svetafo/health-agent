@@ -1,26 +1,26 @@
 -- Migration 005: medical analyses
--- Три таблицы для хранения медицинских исследований.
+-- Three tables for storing medical study documents.
 --
--- lab_sessions   — «конверт» одного лабораторного документа.
---                  Один поход в лабораторию / один PDF = одна строка.
---                  Хранит метаданные: когда, где, с каким контекстом.
+-- lab_sessions   — "envelope" for one lab document.
+--                  One lab visit / one PDF = one row.
+--                  Stores metadata: when, where, with what context.
 --
--- lab_results    — каждый числовой показатель из документа = одна строка (EAV).
---                  Ссылается на lab_sessions. Позволяет строить динамику по
---                  любому параметру (glucose, insulin, fsh...) за любой период.
+-- lab_results    — each numeric value from the document = one row (EAV).
+--                  References lab_sessions. Enables trends for any
+--                  parameter (glucose, insulin, fsh...) over any period.
 --
--- doctor_reports — текстовые заключения врачей.
---                  УЗИ, МРТ, рентген, маммография, цитология, мазок.
---                  Один документ = одна строка. Хранит полный текст протокола
---                  и отдельно — итоговое заключение.
+-- doctor_reports — text conclusions from doctors.
+--                  Ultrasound, MRI, X-ray, mammography, cytology, smear.
+--                  One document = one row. Stores the full protocol text
+--                  and separately — the final conclusion.
 
 CREATE TABLE IF NOT EXISTS lab_sessions (
     id          BIGSERIAL   PRIMARY KEY,
     user_id     TEXT        NOT NULL,
     test_date   DATE        NOT NULL,
     lab_name    TEXT,                       -- "Invitro", "MedSwiss"
-    source_file TEXT,                       -- имя файла или "photo.jpg"
-    notes       TEXT,                       -- контекст: "после отмены метформина 2 мес"
+    source_file TEXT,                       -- filename or "photo.jpg"
+    notes       TEXT,                       -- context: "after stopping metformin 2 months"
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -28,17 +28,17 @@ CREATE TABLE IF NOT EXISTS lab_results (
     id              BIGSERIAL   PRIMARY KEY,
     session_id      BIGINT      REFERENCES lab_sessions(id) ON DELETE CASCADE,
     user_id         TEXT        NOT NULL,
-    test_date       DATE        NOT NULL,   -- денормализовано для быстрых запросов
-    parameter_name  TEXT        NOT NULL,   -- "Глюкоза" (как написано в документе)
-    parameter_key   TEXT        NOT NULL,   -- "glucose" (стандартный ключ для запросов)
+    test_date       DATE        NOT NULL,   -- denormalized for fast queries
+    parameter_name  TEXT        NOT NULL,   -- "Glucose" (as written in document)
+    parameter_key   TEXT        NOT NULL,   -- "glucose" (standard key for queries)
     category        TEXT        NOT NULL,   -- "biochemistry" | "hormones" | "cbc" | ...
-    value_numeric   NUMERIC,                -- 5.2 (NULL если значение типа "< 37")
-    value_text      TEXT,                   -- исходная строка: "5.2", "< 37", "отриц."
-    unit            TEXT,                   -- "ммоль/л", "мЕд/л"
-    ref_min         NUMERIC,                -- нижняя граница нормы
-    ref_max         NUMERIC,                -- верхняя граница нормы
-    ref_text        TEXT,                   -- если норма текстовая, а не числовая
-    is_abnormal     BOOLEAN,                -- выходит за пределы ref_min..ref_max
+    value_numeric   NUMERIC,                -- 5.2 (NULL if value is like "< 37")
+    value_text      TEXT,                   -- original string: "5.2", "< 37", "negative"
+    unit            TEXT,                   -- "mmol/L", "mIU/L"
+    ref_min         NUMERIC,                -- lower reference range
+    ref_max         NUMERIC,                -- upper reference range
+    ref_text        TEXT,                   -- if reference range is text, not numeric
+    is_abnormal     BOOLEAN,                -- outside ref_min..ref_max range
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -47,13 +47,13 @@ CREATE TABLE IF NOT EXISTS doctor_reports (
     user_id     TEXT        NOT NULL,
     study_date  DATE        NOT NULL,
     study_type  TEXT        NOT NULL,   -- "uzi" | "mrt" | "rentgen" | "mammografia" | "cytology" | "other"
-    body_area   TEXT,                   -- "малый таз", "позвоночник L4-S1", "плечо"
-    description TEXT,                   -- полный текст протокола исследования
-    conclusion  TEXT,                   -- только итоговое заключение врача
-    equipment   TEXT,                   -- аппарат: "Philips IU 22", "МРТ Ingenia 1.5T"
-    doctor      TEXT,                   -- ФИО врача
+    body_area   TEXT,                   -- "pelvis", "lumbar spine L4-S1", "shoulder"
+    description TEXT,                   -- full protocol text
+    conclusion  TEXT,                   -- final doctor conclusion only
+    equipment   TEXT,                   -- device: "Philips IU 22", "MRI Ingenia 1.5T"
+    doctor      TEXT,                   -- doctor name
     lab_name    TEXT,                   -- "MedSwiss", "Invitro"
-    source_file TEXT,                   -- имя файла
+    source_file TEXT,                   -- filename
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

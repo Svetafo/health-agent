@@ -1,4 +1,4 @@
-"""Тесты для src/health/intake.py — чистая логика, без БД и сети."""
+"""Tests for src/health/intake.py — pure logic, no DB or network."""
 
 import pytest
 from datetime import date, datetime
@@ -37,7 +37,7 @@ class TestNormalizeDecimal:
         assert normalize_decimal("3.14") == Decimal("3.14")
 
     def test_string_comma(self):
-        """Русская локаль iPhone: запятая вместо точки."""
+        """iPhone Russian locale: comma as decimal separator."""
         assert normalize_decimal("3,14") == Decimal("3.14")
 
     def test_string_comma_integer(self):
@@ -80,29 +80,29 @@ class TestNormalizeSleepMin:
         assert normalize_sleep_min(None) is None
 
     def test_minutes_unchanged(self):
-        """Значения <= 1440 — уже минуты."""
-        assert normalize_sleep_min(480) == 480  # 8 часов
+        """Values <= 1440 — already minutes."""
+        assert normalize_sleep_min(480) == 480  # 8 hours
 
     def test_seconds_converted(self):
-        """Значения > 1440 — секунды, делим на 60."""
-        assert normalize_sleep_min(28800) == 480  # 8 часов = 28800 сек
+        """Values > 1440 — seconds, divide by 60."""
+        assert normalize_sleep_min(28800) == 480  # 8 hours = 28800 sec
 
     def test_boundary_1440(self):
-        """1440 минут = ровно 24 часа — граница, не конвертируем."""
+        """1440 minutes = exactly 24 hours — boundary, no conversion."""
         assert normalize_sleep_min(1440) == 1440
 
     def test_boundary_1441_converts(self):
-        """1441 уже секунды."""
+        """1441 is already seconds."""
         assert normalize_sleep_min(1441) == 24  # 1441 // 60
 
     def test_string_seconds(self):
-        assert normalize_sleep_min("3600") == 60  # 1 час
+        assert normalize_sleep_min("3600") == 60  # 1 hour
 
     def test_zero(self):
         assert normalize_sleep_min(0) == 0
 
     def test_small_value(self):
-        assert normalize_sleep_min(90) == 90  # 90 минут
+        assert normalize_sleep_min(90) == 90  # 90 minutes
 
 
 # ---------------------------------------------------------------------------
@@ -120,14 +120,14 @@ class TestParseDate:
         assert parse_date("03/07/2026") == date(2026, 3, 7)
 
     def test_dict_shortcuts_format(self):
-        """iOS Shortcuts оборачивает дату: {'': '2026-02-25'}."""
+        """iOS Shortcuts wraps date: {'': '2026-02-25'}."""
         assert parse_date({"": "2026-02-25"}) == date(2026, 2, 25)
 
     def test_dict_any_key(self):
         assert parse_date({"date": "2026-02-25"}) == date(2026, 2, 25)
 
     def test_date_with_time_comma(self):
-        """iOS иногда присылает '07.03.2026, 12:00' — берём только дату."""
+        """iOS sometimes sends '07.03.2026, 12:00' — take only the date part."""
         assert parse_date("07.03.2026, 12:00") == date(2026, 3, 7)
 
     def test_iso_with_time_comma(self):
@@ -161,7 +161,7 @@ class TestParseDatetime:
         assert result.tzinfo is None  # naive
 
     def test_iso_with_timezone_no_colon(self):
-        """Python 3.11 не понимает +0300 без двоеточия."""
+        """Python 3.11 does not handle +0300 without colon."""
         result = parse_datetime("2026-03-05T23:15:00+0300")
         assert result == datetime(2026, 3, 5, 23, 15, 0)
 
