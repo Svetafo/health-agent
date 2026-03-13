@@ -701,15 +701,10 @@ async def _handle_text(message: Message, db: asyncpg.Pool, user_id: str) -> None
             result = await analyze_body_metrics_image(buf.getvalue(), "image/jpeg")
             clean = {k: v for k, v in result.items() if v is not None}
 
-            # Year validation: scales show date without year → vision LLM may pick wrong year
+            # Validate date format only
             if "date" in clean:
                 try:
-                    extracted = date.fromisoformat(clean["date"])
-                    today = date.today()
-                    if extracted.year < today.year:
-                        fixed = extracted.replace(year=today.year)
-                        log.warning("date year corrected: %s → %s", clean["date"], fixed)
-                        clean["date"] = fixed.isoformat()
+                    date.fromisoformat(clean["date"])  # just validate format
                 except (ValueError, TypeError):
                     clean.pop("date", None)
 

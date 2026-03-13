@@ -97,7 +97,7 @@ Health data flows via iOS Shortcuts → n8n webhook → agent.
 For the full field mapping see `src/health/intake.py`. Alternatively, export `export.xml` from the Health app weekly and run:
 
 ```bash
-docker exec bmindset-app-1 python3 scripts/import_health_export.py /path/to/export.xml
+docker exec health-agent-app-1 python3 scripts/import_health_export.py /path/to/export.xml
 ```
 
 ## Bot commands

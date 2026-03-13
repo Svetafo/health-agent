@@ -327,7 +327,7 @@ _BODY_METRICS_PROMPT = """Analyze the photo or screenshot from a smart scale and
 {"weight": 70.5, "body_fat_pct": 28.5, "muscle_kg": 45.2, "water_pct": 52.3, "visceral_fat": 8, "bone_mass_kg": 2.3, "bmr_kcal": 1450, "bmi": 24.5, "date": null}
 
 Use the numbers exactly as shown on the screen. If a field is not on the screen — set it to null.
-date — ISO date (YYYY-MM-DD) if visible on screen, otherwise null.
+date — ISO date (YYYY-MM-DD) ONLY if the year is explicitly visible on screen (e.g. "2025-01-12" or "12.01.2025"). If only day and month are shown without year — return null.
 Return ONLY JSON, no explanations."""
 
 

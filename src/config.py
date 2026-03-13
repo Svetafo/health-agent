@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     # Internal key for /pipeline/* endpoints (n8n → app). Empty = no check (insecure).
     internal_api_key: str = ""
     # Agent name — used in system prompts and logs
-    app_name: str = "BMindset"
+    app_name: str = "Health Agent"
     # Timeout for acquiring a connection from the DB pool (seconds)
     db_acquire_timeout: float = 5.0
     # Models by task (can be overridden via .env)

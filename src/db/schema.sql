@@ -1,4 +1,4 @@
--- BMindset: основные таблицы
+-- Health Agent: database schema
 
 CREATE TABLE IF NOT EXISTS raw_events (
     id          BIGSERIAL PRIMARY KEY,

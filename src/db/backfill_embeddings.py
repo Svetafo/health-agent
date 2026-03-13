@@ -1,7 +1,7 @@
 """Backfill embeddings for existing user messages.
 
 Usage:
-    docker exec -it bmindset-app-1 python -m src.db.backfill_embeddings
+    docker exec -it health-agent-app-1 python -m src.db.backfill_embeddings
 
 Idempotent: ON CONFLICT DO NOTHING — safe to run repeatedly.
 Rate limit: 0.1s delay between requests to the OpenAI Embeddings API.
