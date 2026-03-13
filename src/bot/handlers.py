@@ -14,7 +14,7 @@ from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
 
-from src.agent.analyst import ASK_SYSTEM, REPORT_INTENT, SCOPE_INTENT, run_analyst, select_tools
+from src.agent.analyst import ANALYST_TOOLS, ASK_SYSTEM, REPORT_INTENT, SCOPE_INTENT, run_analyst, select_tools
 from src.config import settings
 from src.health.analyses import process_medical_document
 from src.pipeline.kb_ingest import ingest_file, ingest_url
@@ -196,6 +196,12 @@ SYSTEM_PROMPT = (
     "Name uncomfortable truths directly. "
     "Separate proven from hypothesis: 'data shows X' vs 'possible explanation Y'. "
     "If data is missing — say so, do not give advice from thin air.\n\n"
+
+    "CRITICAL — NO NUMBERS WITHOUT DATA: "
+    "NEVER name specific numbers (weight, HRV, calories, VO2max, body fat percentages, etc.) "
+    "if they were NOT explicitly passed to you in this conversation by the user or by tools. "
+    "The user profile is descriptive context, not numerical facts to quote. "
+    "If current data is needed — tell the user to use /ask.\n\n"
 
     "PSYCHOTHERAPEUTIC CONTEXT: when working with thoughts, decisions, patterns, apply:\n"
     "— CBT: notice cognitive distortions, automatic thoughts, and beliefs.\n"
@@ -1103,24 +1109,36 @@ async def _handle_text(message: Message, db: asyncpg.Pool, user_id: str) -> None
         )
         asyncio.create_task(_embed_and_store(db, msg_id, user_id, tagged))
 
-        # Plain text without mode — route through agent if it is a data query
-        if not mode:
-            agent_tools = select_tools(text)
-            # If select_tools found anything beyond profile/memory — it is a data query
-            data_tools = [t for t in agent_tools if t["function"]["name"] not in ("get_user_profile", "get_memory_insights")]
-            if data_tools:
-                agent_intent = (
-                    f"User question: {text}\n\n"
-                    "Use tools to retrieve real data and answer with facts."
-                )
+        # /mind, /decision and plain text with data — route through agent with tools
+        if mode in ("mind", "decision") or not mode:
+            if mode in ("mind", "decision"):
+                # Base tools for psychological context + relevant tools from text
+                # select_tools with 0 matches returns all 14 (fallback) — we don't want that
+                # So we take only what matched, plus a fixed base set
+                _MIND_BASE = {"get_user_profile", "get_memory_insights", "get_mind_entries"}
+                selected = select_tools(text)
+                if len(selected) == len(ANALYST_TOOLS):
+                    # fallback triggered (0 matches) — use only base set
+                    agent_tools = [t for t in ANALYST_TOOLS if t["function"]["name"] in _MIND_BASE]
+                else:
+                    # real matches found — add to base set
+                    selected_names = {t["function"]["name"] for t in selected} | _MIND_BASE
+                    agent_tools = [t for t in ANALYST_TOOLS if t["function"]["name"] in selected_names]
+            else:
+                agent_tools = select_tools(text)
+                data_tools = [t for t in agent_tools if t["function"]["name"] not in ("get_user_profile", "get_memory_insights")]
+                if not data_tools:
+                    agent_tools = None  # plain text without data — fall through to ask_model
+
+            if agent_tools is not None:
                 agent_history = await _get_agent_history(conn, session_id, query=text)
                 try:
                     reply, label = await _run_with_status(
                         message,
-                        run_analyst(db, user_id, agent_intent, force_tools=True, system=ASK_SYSTEM, history=agent_history, return_model=True, tools=agent_tools),
+                        run_analyst(db, user_id, prompt, system=system, history=agent_history, return_model=True, tools=agent_tools),
                     )
                 except Exception as e:
-                    log.exception("run_analyst (text) failed: %s", e)
+                    log.exception("run_analyst (%s) failed: %s", mode or "text", e)
                     await message.answer(f"Agent error: {e}")
                     return
                 await conn.execute(
@@ -1128,6 +1146,9 @@ async def _handle_text(message: Message, db: asyncpg.Pool, user_id: str) -> None
                     session_id, reply,
                 )
                 await _send_long(message, f"{label}:\n\n{reply}")
+                if mode in ("mind", "decision"):
+                    _user_state.pop(user_id, None)
+                    await message.answer("/mind  /decision  /food  /report  /scope")
                 return
 
         try:
@@ -1145,10 +1166,6 @@ async def _handle_text(message: Message, db: asyncpg.Pool, user_id: str) -> None
             session_id,
             reply,
         )
-
-    if mode in ("mind", "decision"):
-        _user_state.pop(user_id, None)
-        reply += "\n\n/mind  /decision  /food  /report  /scope"
 
     await _send_long(message, f"{label}:\n\n{reply}")
 
