@@ -505,7 +505,7 @@ ANALYST_TOOLS = [
 # Dynamic tool selection
 # ---------------------------------------------------------------------------
 
-_ALWAYS_TOOL_NAMES = {"get_user_profile", "get_memory_insights"}
+_ALWAYS_TOOL_NAMES = {"get_user_profile", "get_memory_insights", "search_knowledge_base"}
 
 _TOOL_CATEGORIES: dict[str, dict] = {
     "workout": {
