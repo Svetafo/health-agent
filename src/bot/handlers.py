@@ -108,12 +108,19 @@ _DOC_PHRASES = [
 
 
 def _strip_tables(text: str) -> str:
-    """Converts markdown tables to dash-separated lists."""
+    """Converts markdown tables to dash lists, strips ## headers to bold text."""
     lines = text.split("\n")
     result = []
     i = 0
     while i < len(lines):
         line = lines[i]
+        # Markdown headers ## → **bold text** without hashes
+        if line.strip().startswith("#"):
+            clean = line.lstrip("#").strip()
+            if clean:
+                result.append(f"**{clean}**")
+            i += 1
+            continue
         # Table row: starts and ends with |
         if line.strip().startswith("|") and "|" in line.strip()[1:]:
             # Skip separator |---|---|
@@ -1075,13 +1082,12 @@ async def _handle_text(message: Message, db: asyncpg.Pool, user_id: str) -> None
         tagged = f"[MIND] {text}"
         prompt = (
             f"User's thought:\n{text}\n\n"
-            "Analyze in layers:\n"
-            "1. WHAT IS SAID EXPLICITLY — what this thought signals on the surface, what is central\n"
-            "2. CONTRADICTIONS AND TENSIONS — where inside the thought there are inconsistencies, duality, incompleteness\n"
-            "3. WHAT IS HIDDEN DEEPER — what needs, fears, schemas, or beliefs underlie this\n"
-            "4. PATTERN — is there a connection to previous entries, a recurring theme\n"
-            "5. WHAT THIS THOUGHT MIGHT MEAN — one clear conclusion or question worth sitting with\n"
-            "Apply CBT, schema approach, mentalization — no jargon, natural language."
+            "If the thought has physical context (weight, fatigue, sleep, food, activity) — "
+            "load relevant data via tools first.\n\n"
+            "Reply concisely and directly — no headers, no numbered sections.\n"
+            "Format: one key observation → mechanism (what's really behind this) → concrete conclusion or action.\n"
+            "Max 200 words. Apply CBT, schema approach, mentalization — no jargon, natural language.\n"
+            "Be direct, don't console, don't list."
         )
     elif mode == "decision":
         tagged = f"[DECISION] {text}"
