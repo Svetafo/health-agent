@@ -332,6 +332,9 @@ async def cmd_sleep(message: Message) -> None:
 @router.message(Command("done"))
 async def cmd_done(message: Message, db: asyncpg.Pool) -> None:
     user_id = str(message.from_user.id)
+    if not _is_allowed(user_id):
+        await _deny(message)
+        return
     async with _get_user_lock(user_id):
         # --- Save sleep data ---
         if _user_state.get(user_id) == "sleep":
@@ -472,6 +475,9 @@ async def cmd_plateau(message: Message, db: asyncpg.Pool) -> None:
 @router.message(Command("fix"))
 async def cmd_fix(message: Message, db: asyncpg.Pool) -> None:
     user_id = str(message.from_user.id)
+    if not _is_allowed(user_id):
+        await _deny(message)
+        return
     async with _get_user_lock(user_id):
         async with db.acquire(timeout=settings.db_acquire_timeout) as conn:
             row = await conn.fetchrow(
@@ -720,6 +726,10 @@ async def _handle_text(message: Message, db: asyncpg.Pool, user_id: str) -> None
                     date.fromisoformat(clean["date"])  # just validate format
                 except (ValueError, TypeError):
                     clean.pop("date", None)
+                    await message.answer(
+                        "Could not recognize the date on the screenshot — will save as today's measurement. "
+                        "If the date is different, enter it manually, e.g.: 'date 2025-01-12'"
+                    )
 
             data_fields = {k: v for k, v in clean.items() if k != "date"}
             if not data_fields:
@@ -1083,6 +1093,13 @@ async def _handle_text(message: Message, db: asyncpg.Pool, user_id: str) -> None
         if not parsed:
             await message.answer("Didn't understand measurements. Try: 'arms 27, hips 51, waist 74'.")
             return
+        # If buffer already has data with different date — save previous
+        buf_date = _weight_buffer.get(user_id, {}).get("date")
+        new_date = parsed.get("date")
+        if buf_date and new_date and buf_date != new_date and _weight_buffer.get(user_id):
+            await _save_body_metrics(message, db, user_id, dict(_weight_buffer[user_id]))
+            _weight_buffer[user_id] = {}
+
         _weight_buffer.setdefault(user_id, {}).update(parsed)
         _weight_buffer[user_id].setdefault("_source", "text")
         fields_summary = ", ".join(
