@@ -14,7 +14,7 @@ from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
 
-from src.agent.analyst import ANALYST_TOOLS, ASK_SYSTEM, REPORT_INTENT, SCOPE_INTENT, run_analyst, select_tools
+from src.agent.analyst import ANALYST_TOOLS, _build_ask_system, REPORT_INTENT, SCOPE_INTENT, run_analyst, select_tools
 from src.config import settings
 from src.health.analyses import process_medical_document
 from src.pipeline.kb_ingest import ingest_file, ingest_url
@@ -525,7 +525,7 @@ async def cmd_ask(message: Message, db: asyncpg.Pool) -> None:
     try:
         reply, label = await _run_with_status(
             message,
-            run_analyst(db, user_id, agent_intent, force_tools=True, system=ASK_SYSTEM, history=history, return_model=True, tools=select_tools(intent)),
+            run_analyst(db, user_id, agent_intent, force_tools=True, system=_build_ask_system(), history=history, return_model=True, tools=select_tools(intent)),
         )
     except Exception as e:
         if "rate_limit" in str(e).lower() or "RateLimitError" in type(e).__name__:
@@ -975,7 +975,7 @@ async def _handle_text(message: Message, db: asyncpg.Pool, user_id: str) -> None
         try:
             reply, label = await _run_with_status(
                 message,
-                run_analyst(db, user_id, agent_intent, force_tools=True, system=ASK_SYSTEM, history=history, return_model=True, tools=select_tools(text)),
+                run_analyst(db, user_id, agent_intent, force_tools=True, system=_build_ask_system(), history=history, return_model=True, tools=select_tools(text)),
             )
         except Exception as e:
             log.exception("run_analyst (ask-state) failed: %s", e)
@@ -1167,7 +1167,10 @@ async def _handle_text(message: Message, db: asyncpg.Pool, user_id: str) -> None
                 agent_tools = select_tools(text)
                 data_tools = [t for t in agent_tools if t["function"]["name"] not in ("get_user_profile", "get_memory_insights", "search_knowledge_base")]
                 if not data_tools:
-                    agent_tools = None  # plain text without data — fall through to ask_model
+                    if _needs_history(text):
+                        agent_tools = ANALYST_TOOLS  # follow-up without data keywords — all tools, agent decides
+                    else:
+                        agent_tools = None  # plain text without data or context — fall through to ask_model
 
             if agent_tools is not None:
                 agent_history = await _get_agent_history(conn, session_id, query=text)

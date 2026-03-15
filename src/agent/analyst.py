@@ -65,13 +65,35 @@ ANALYST_SYSTEM = (
     "or from_date + to_date (format YYYY-MM-DD)."
 )
 
-ASK_SYSTEM = (
+def _build_ask_system() -> str:
+    today = date.today().isoformat()
+    return (
     f"You are {settings.app_name}, a personal analyst.\n\n"
+    f"Today is {today}. Current year is {date.today().year}. "
+    "When the user says 'this month', 'last month', 'this year' — "
+    f"they mean {date.today().year}, not previous years.\n\n"
     "First load the needed data via tools, then answer.\n\n"
+    "SAFETY: never recommend a daily calorie intake below 1400 kcal — that is below basal metabolic rate and medically dangerous. "
+    "To estimate maintenance calories use TDEE from health_metrics (active_kcal + resting_kcal), not short-term weight fluctuations. "
+    "Weight fluctuations of 1-2 kg over 1-2 weeks are water and glycogen, not fat; do not draw metabolic conclusions from such periods.\n\n"
+    "KNOWLEDGE BASE: for questions about metabolism, calorie norms, insulin resistance, protein, body composition — "
+    "always call search_knowledge_base to find relevant research and provide an evidence-based answer.\n\n"
+    "DATA: never ask the user questions to obtain data — use tools only. "
+    "If there is no data for a period — say so directly, do not ask the user to recall or clarify. "
+    "On follow-up questions — re-query data via tools, do not rely on numbers from previous answers in history. "
+    "Never assume the user logged data poorly or forgot to record something.\n\n"
+    "NO NUMBERS WITHOUT DATA: NEVER state specific numbers (weight, calories, HRV, VO2max, body fat % etc.) "
+    "if they were not returned by tools in this call. "
+    "Data from memory_insights and conversation history — context only, not facts to quote. "
+    "If a tool returned an empty result — say 'no data for this period', do not invent.\n\n"
     "TONE: facts + one conclusion, brief and direct. "
     "Never end with a question or 'let me know'. "
     "No praise, exclamations, or bureaucratic language. "
     "Round numbers, add context when it helps.\n\n"
+    "SYNTHESIS: when a question compares multiple metrics (weight + calories + activity etc.) — "
+    "do not give separate blocks per metric. Load all data first, then answer in one coherent text: "
+    "over this period with average intake X and activity Y, weight changed from A to B. "
+    "Then the conclusion: what this means and what to do. Do not split into Weight/Calories/Activity headings.\n\n"
     "FORMAT (Telegram): never use markdown tables — they don't render. "
     "Instead of tables: bold heading + list of lines with dashes. "
     "Do not list raw data day by day — compute yourself: average, total, trend. "
@@ -642,12 +664,13 @@ async def _tool_get_health_metrics(
         return f"No health data for period {d_from} — {d_to}."
 
     # Averages for the period
-    hrv_vals  = [r["hrv_ms"] for r in rows if r["hrv_ms"]]
-    hr_vals   = [r["heart_rate"] for r in rows if r["heart_rate"]]
-    rhr_vals  = [r["resting_hr"] for r in rows if r["resting_hr"]]
-    step_vals = [r["steps"] for r in rows if r["steps"]]
-    kcal_vals = [r["active_kcal"] for r in rows if r["active_kcal"]]
-    km_vals   = [r["distance_km"] for r in rows if r["distance_km"]]
+    hrv_vals   = [r["hrv_ms"] for r in rows if r["hrv_ms"]]
+    hr_vals    = [r["heart_rate"] for r in rows if r["heart_rate"]]
+    rhr_vals   = [r["resting_hr"] for r in rows if r["resting_hr"]]
+    step_vals  = [r["steps"] for r in rows if r["steps"]]
+    kcal_vals  = [r["active_kcal"] for r in rows if r["active_kcal"]]
+    total_vals = [r["total_kcal"] for r in rows if r["total_kcal"]]
+    km_vals    = [r["distance_km"] for r in rows if r["distance_km"]]
 
     def avg(lst): return round(sum(lst) / len(lst), 1) if lst else None
 
@@ -656,18 +679,20 @@ async def _tool_get_health_metrics(
         f"Averages: HRV {avg(hrv_vals)}ms, HR {avg(hr_vals)}, RestHR {avg(rhr_vals)}, "
         f"steps {round(avg(step_vals)) if avg(step_vals) else '—'}/d, "
         f"activity {round(avg(kcal_vals)) if avg(kcal_vals) else '—'}kcal, "
+        f"TDEE {round(avg(total_vals)) if avg(total_vals) else '—'}kcal/d, "
         f"distance {avg(km_vals)}km"
     )
     lines.append("Details:")
     for r in rows:
         parts = []
-        if r["hrv_ms"]:    parts.append(f"HRV {r['hrv_ms']}")
-        if r["heart_rate"]: parts.append(f"HR {r['heart_rate']}")
-        if r["resting_hr"]: parts.append(f"RestHR {r['resting_hr']}")
-        if r["steps"]:     parts.append(f"steps {r['steps']}")
-        if r["active_kcal"]: parts.append(f"{r['active_kcal']}kcal")
+        if r["hrv_ms"]:     parts.append(f"HRV {r['hrv_ms']}")
+        if r["heart_rate"]:  parts.append(f"HR {r['heart_rate']}")
+        if r["resting_hr"]:  parts.append(f"RestHR {r['resting_hr']}")
+        if r["steps"]:       parts.append(f"steps {r['steps']}")
+        if r["active_kcal"]: parts.append(f"active {r['active_kcal']}kcal")
+        if r["total_kcal"]:  parts.append(f"TDEE {r['total_kcal']}kcal")
         if r["distance_km"]: parts.append(f"{r['distance_km']}km")
-        if r["vo2max"]:    parts.append(f"VO2 {r['vo2max']}")
+        if r["vo2max"]:      parts.append(f"VO2 {r['vo2max']}")
         lines.append(f"  {r['recorded_date']}: {', '.join(parts)}")
     return "\n".join(lines)
 
@@ -860,7 +885,7 @@ async def _tool_get_body_metrics(
         rows = await conn.fetch(
             """
             SELECT recorded_date, weight, body_fat_pct, muscle_kg, water_pct,
-                   visceral_fat, bmi, arms_cm, thighs_cm, waist_cm, hips_cm
+                   visceral_fat, bmi, bmr_kcal, arms_cm, thighs_cm, waist_cm, hips_cm
             FROM body_metrics
             WHERE user_id = $1 AND recorded_date BETWEEN $2 AND $3
             ORDER BY recorded_date DESC
@@ -888,6 +913,7 @@ async def _tool_get_body_metrics(
         if r["muscle_kg"]:    parts.append(f"muscle {r['muscle_kg']}kg")
         if r["water_pct"]:    parts.append(f"water {r['water_pct']}%")
         if r["visceral_fat"]: parts.append(f"visc {r['visceral_fat']}")
+        if r["bmr_kcal"]:     parts.append(f"BMR {r['bmr_kcal']}kcal")
         if r["waist_cm"]:     parts.append(f"waist {r['waist_cm']}cm")
         if r["hips_cm"]:      parts.append(f"hips {r['hips_cm']}cm")
         if r["arms_cm"]:      parts.append(f"arms {r['arms_cm']}cm")
